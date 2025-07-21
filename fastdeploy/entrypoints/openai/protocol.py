@@ -457,6 +457,7 @@ class ChatCompletionRequest(BaseModel):
         req_dict["logprobs"] = self.top_logprobs if self.logprobs else None
 
         if self.metadata is not None:
+            assert "raw_request" not in self.metadata, "The parameter `raw_request` is not supported now, please use completion api instead."
             for key, value in self.metadata.items():
                 req_dict[key] = value
 
