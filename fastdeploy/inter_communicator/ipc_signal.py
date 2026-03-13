@@ -92,6 +92,7 @@ class IPCSignal:
                 self.value = None
             else:
                 llm_logger.debug(f"attaching ipc signal: {name}")
+                self._wait_for_shm(name)
                 self.shm = SharedMemory(name=name)
                 self.value = None
         else:
@@ -108,8 +109,34 @@ class IPCSignal:
                 self.value[:] = array  # Initialize with input array data
             else:
                 llm_logger.debug(f"attaching ipc signal: {name}")
+                self._wait_for_shm(name)
                 self.shm = SharedMemory(name=name)
                 self.value: np.ndarray = np.ndarray(array.shape, dtype=array.dtype, buffer=self.shm.buf)
+    @staticmethod
+    def _wait_for_shm(name: str, poll_interval: float = 0.1, timeout: float = 60.0) -> None:
+        """Wait until a shared memory block with the given name exists.
+
+        Args:
+            name: The shared memory block name to wait for.
+            poll_interval: Seconds between existence checks.
+            timeout: Maximum seconds to wait before raising an error.
+
+        Raises:
+            TimeoutError: If the shared memory is not created within timeout.
+        """
+        if shared_memory_exists(name):
+            return
+        llm_logger.info(f"Shared memory '{name}' not found yet, waiting for it to be created...")
+        elapsed = 0.0
+        while not shared_memory_exists(name):
+            time.sleep(poll_interval)
+            elapsed += poll_interval
+            if elapsed >= timeout:
+                raise TimeoutError(
+                    f"Shared memory '{name}' was not created within {timeout}s. "
+                    "Ensure the creator process is running."
+                )
+        llm_logger.info(f"Shared memory '{name}' is now available (waited {elapsed:.1f}s).")
 
     def clear(self) -> None:
         """Release system resources and unlink the shared memory block."""
